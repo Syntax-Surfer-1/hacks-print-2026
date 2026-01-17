@@ -58,6 +58,7 @@ def verify_ppe_with_gemini(image_base64: str) -> str:
     )
     prompt = "Analyze frame for PPE compliance."
     try:
+        # Note: In production, consider a local/managed PPE check to reduce API costs/latency
         response = model.generate_content([
             {"text": prompt},
             {"inline_data": {"mime_type": "image/jpeg", "data": image_base64}}
@@ -145,7 +146,8 @@ def manual_upload():
 def manual_mark():
     data = request.get_json()
     worker_id = data.get("worker_id")
-    status = data.get("status", "PRESENT") # Now accepts 'PRESENT' or 'ABSENT'
+    status = data.get("status", "PRESENT")
+    date_str = data.get("date", datetime.now().date().isoformat())
     
     try:
         supabase.table("attendance").insert({
@@ -154,7 +156,7 @@ def manual_mark():
             "ppe_status": "ADMIN_OVERRIDE",
             "ppe_missing_items": f"Marked {status} by Admin",
             "ppe_image_url": None,
-            "date": datetime.now().date().isoformat()
+            "date": date_str
         }).execute()
         return jsonify({"status": "SUCCESS"})
     except Exception as e:
@@ -162,12 +164,13 @@ def manual_mark():
 
 @app.route("/api/stats", methods=["GET"])
 def get_stats():
-    today = datetime.now().date().isoformat()
+    # Allow filtering stats by date
+    target_date = request.args.get('date', datetime.now().date().isoformat())
     try:
-        # Fetch all logs for today, ordered by creation time (latest last)
-        logs = supabase.table("attendance").select("worker_id, attendance_status, created_at").eq("date", today).order("created_at").execute()
+        # Fetch all logs for specified date, ordered by creation time
+        logs = supabase.table("attendance").select("worker_id, attendance_status, created_at").eq("date", target_date).order("created_at").execute()
         
-        # Track the LATEST status for each worker who interacted with the system today
+        # Track the LATEST status for each worker who interacted with the system on that date
         latest_status_map = {}
         for l in logs.data:
             latest_status_map[l['worker_id']] = l['attendance_status']
@@ -182,20 +185,32 @@ def get_stats():
         return jsonify({
             "present": present_count, 
             "absent": absent_count, 
-            "total_workers": total_workers_in_db
+            "total_workers": total_workers_in_db,
+            "date": target_date
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/logs", methods=["GET"])
 def get_logs():
-    logs = supabase.table("attendance").select("worker_id, attendance_status, ppe_status, ppe_missing_items, created_at").order("created_at", desc=True).execute()
-    return jsonify(logs.data)
+    target_date = request.args.get('date')
+    try:
+        query = supabase.table("attendance").select("worker_id, attendance_status, ppe_status, ppe_missing_items, created_at, date")
+        if target_date:
+            query = query.eq("date", target_date)
+        
+        logs = query.order("created_at", desc=True).execute()
+        return jsonify(logs.data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/workers", methods=["GET"])
 def get_workers():
-    workers = supabase.table("workers").select("*").execute()
-    return jsonify(workers.data)
+    try:
+        workers = supabase.table("workers").select("*").execute()
+        return jsonify(workers.data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/workers", methods=["POST"])
 def add_worker():
@@ -228,9 +243,13 @@ def add_worker():
 
 @app.route("/api/workers/<worker_id>", methods=["DELETE"])
 def delete_worker(worker_id):
-    supabase.table("attendance").delete().eq("worker_id", worker_id).execute()
-    supabase.table("workers").delete().eq("worker_id", worker_id).execute()
-    return jsonify({"status": "ok"})
+    try:
+        # Cascade delete logs locally as well to be safe
+        supabase.table("attendance").delete().eq("worker_id", worker_id).execute()
+        supabase.table("workers").delete().eq("worker_id", worker_id).execute()
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
