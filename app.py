@@ -140,17 +140,19 @@ def manual_upload():
 # ADMIN API
 # =====================
 
-# Manual mark present from Admin Panel
+# Manual mark status from Admin Panel
 @app.route("/api/manual-mark", methods=["POST"])
 def manual_mark():
     data = request.get_json()
     worker_id = data.get("worker_id")
+    status = data.get("status", "PRESENT") # Now accepts 'PRESENT' or 'ABSENT'
+    
     try:
         supabase.table("attendance").insert({
             "worker_id": worker_id,
-            "attendance_status": "PRESENT",
+            "attendance_status": status,
             "ppe_status": "ADMIN_OVERRIDE",
-            "ppe_missing_items": "Marked by Admin",
+            "ppe_missing_items": f"Marked {status} by Admin",
             "ppe_image_url": None,
             "date": datetime.now().date().isoformat()
         }).execute()
