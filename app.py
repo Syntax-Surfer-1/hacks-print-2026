@@ -80,13 +80,8 @@ def verify():
         image_bytes = base64.b64decode(raw_b64)
         file_name = f"auto_{worker_id}_{uuid.uuid4()}.jpg"
 
-        # Upload for processing
         supabase.storage.from_("ppe-images").upload(path=file_name, file=image_bytes, file_options={"content-type": "image/jpeg"})
-        
-        # AI Logic
         ai_result = verify_ppe_with_gemini(raw_b64)
-        
-        # Delete image immediately after AI processing is complete
         supabase.storage.from_("ppe-images").remove([file_name])
 
         if "NO_WORKER" in ai_result:
@@ -95,7 +90,6 @@ def verify():
         status = "PRESENT" if "PPE_OK" in ai_result else "ABSENT"
         missing = ai_result.replace("PPE_MISSING:", "").strip() if status == "ABSENT" else ""
 
-        # Save Text-Only Record
         supabase.table("attendance").insert({
             "worker_id": worker_id,
             "attendance_status": status,
@@ -125,10 +119,8 @@ def manual_upload():
         image_bytes = base64.b64decode(raw_b64)
         file_name = f"manual_{worker_id}_{uuid.uuid4()}.jpg"
         
-        # Uploading the evidence briefly to fulfill the "work"
         supabase.storage.from_("ppe-images").upload(path=file_name, file=image_bytes, file_options={"content-type": "image/jpeg"})
         
-        # Save text record to database
         supabase.table("attendance").insert({
             "worker_id": worker_id,
             "attendance_status": "PRESENT",
@@ -138,7 +130,6 @@ def manual_upload():
             "date": datetime.now().date().isoformat()
         }).execute()
         
-        # Delete image immediately after the work is complete
         supabase.storage.from_("ppe-images").remove([file_name])
         
         return jsonify({"status": "SUCCESS"})
@@ -148,6 +139,25 @@ def manual_upload():
 # =====================
 # ADMIN API
 # =====================
+
+# Manual mark present from Admin Panel
+@app.route("/api/manual-mark", methods=["POST"])
+def manual_mark():
+    data = request.get_json()
+    worker_id = data.get("worker_id")
+    try:
+        supabase.table("attendance").insert({
+            "worker_id": worker_id,
+            "attendance_status": "PRESENT",
+            "ppe_status": "ADMIN_OVERRIDE",
+            "ppe_missing_items": "Marked by Admin",
+            "ppe_image_url": None,
+            "date": datetime.now().date().isoformat()
+        }).execute()
+        return jsonify({"status": "SUCCESS"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/api/stats", methods=["GET"])
 def get_stats():
     today = datetime.now().date().isoformat()
@@ -211,7 +221,5 @@ def delete_worker(worker_id):
     supabase.table("workers").delete().eq("worker_id", worker_id).execute()
     return jsonify({"status": "ok"})
 
-# Vercel handles the application entry point. 
-# The 'app' object defined above is what Vercel will use.
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
