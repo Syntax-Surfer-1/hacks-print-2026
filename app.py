@@ -164,15 +164,24 @@ def manual_mark():
 def get_stats():
     today = datetime.now().date().isoformat()
     try:
-        logs = supabase.table("attendance").select("worker_id, attendance_status").eq("date", today).execute()
-        present_workers = {l['worker_id'] for l in logs.data if l['attendance_status'] == 'PRESENT'}
-        all_attempted_workers = {l['worker_id'] for l in logs.data}
-        absent_only_workers = all_attempted_workers - present_workers
+        # Fetch all logs for today, ordered by creation time (latest last)
+        logs = supabase.table("attendance").select("worker_id, attendance_status, created_at").eq("date", today).order("created_at").execute()
+        
+        # Track the LATEST status for each worker who interacted with the system today
+        latest_status_map = {}
+        for l in logs.data:
+            latest_status_map[l['worker_id']] = l['attendance_status']
+        
+        # Count based on the latest state
+        present_count = sum(1 for status in latest_status_map.values() if status == 'PRESENT')
+        absent_count = sum(1 for status in latest_status_map.values() if status == 'ABSENT')
+        
+        # Fetch total registered workers
         total_workers_in_db = supabase.table("workers").select("id", count="exact").execute().count
         
         return jsonify({
-            "present": len(present_workers), 
-            "absent": len(absent_only_workers), 
+            "present": present_count, 
+            "absent": absent_count, 
             "total_workers": total_workers_in_db
         })
     except Exception as e:
