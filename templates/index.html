@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Smart PPE Kiosk | Pro-Shield</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');
+        
+        :root { 
+            --safety-yellow: #facc15; 
+            --safety-dark: #0f172a; 
+            --glass: rgba(255, 255, 255, 0.03); 
+            --glass-border: rgba(255, 255, 255, 0.1); 
+        }
+
+        body { 
+            background: radial-gradient(circle at top right, #1e293b, #0f172a); 
+            color: #f8fafc; 
+            font-family: 'Space Grotesk', sans-serif; 
+            margin: 0; 
+            min-height: 100vh; 
+            overflow-x: hidden; 
+        }
+
+        .glass-panel { 
+            background: var(--glass); 
+            backdrop-filter: blur(12px); 
+            border: 1px solid var(--glass-border); 
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); 
+        }
+
+        .kiosk-btn { 
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); 
+            -webkit-tap-highlight-color: transparent; 
+        }
+
+        .kiosk-btn:active { transform: scale(0.92); }
+
+        #camera-feed { 
+            transform: scaleX(-1); 
+            filter: brightness(1.1) contrast(1.1); 
+        }
+
+        /* Scanning Laser Animation */
+        .scanner-line {
+            height: 3px;
+            background: var(--safety-yellow);
+            box-shadow: 0 0 20px var(--safety-yellow), 0 0 10px var(--safety-yellow);
+            width: 100%;
+            position: absolute;
+            top: 0;
+            animation: scan 4s linear infinite;
+            z-index: 20;
+            opacity: 0.7;
+        }
+
+        @keyframes scan {
+            0% { top: 10%; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 90%; opacity: 0; }
+        }
+
+        .corner-brace {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--safety-yellow);
+            z-index: 30;
+        }
+
+        .num-font { font-family: 'JetBrains Mono', monospace; }
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="flex flex-col items-center">
+    <!-- Header -->
+    <div class="sticky top-0 left-0 right-0 p-4 flex justify-between items-center z-50 bg-slate-900/40 backdrop-blur-md w-full border-b border-white/5">
+        <div class="flex items-center gap-3">
+            <div class="h-8 w-1 bg-yellow-500 rounded-full"></div>
+            <h1 class="text-lg font-bold uppercase tracking-tighter">Pro-Shield AI</h1>
+        </div>
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2">
+                <span class="h-2 w-2 bg-green-500 rounded-full animate-pulse"></span>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">System Live</span>
+            </div>
+            <span id="clock" class="text-xs font-mono text-slate-300">00:00:00</span>
+        </div>
+    </div>
+
+    <!-- Main Screens -->
+    <main class="w-full max-w-md flex flex-col items-center justify-center p-6 gap-8 pb-12">
+        <!-- SCREEN 1: ID ENTRY -->
+        <div id="screen-id" class="w-full flex flex-col items-center gap-6 fade-in">
+            <div class="text-center">
+                <h2 class="text-4xl font-bold">Welcome</h2>
+                <p class="text-slate-400">Enter Personnel ID</p>
+            </div>
+            <div class="glass-panel w-full p-6 rounded-[2.5rem]">
+                <input type="text" id="worker-id-display" readonly class="w-full text-6xl num-font text-center bg-transparent mb-6 outline-none text-white tracking-widest" placeholder="0000">
+                <div class="grid grid-cols-3 gap-3">
+                    <button onclick="appendNum('1')" class="kiosk-btn bg-white/5 h-16 text-2xl font-medium rounded-2xl border border-white/5">1</button>
+                    <button onclick="appendNum('2')" class="kiosk-btn bg-white/5 h-16 text-2xl font-medium rounded-2xl border border-white/5">2</button>
+                    <button onclick="appendNum('3')" class="kiosk-btn bg-white/5 h-16 text-2xl font-medium rounded-2xl border border-white/5">3</button>
+                    <button onclick="appendNum('4')" class="kiosk-btn bg-white/5 h-16 text-2xl font-medium rounded-2xl border border-white/5">4</button>
+                    <button onclick="appendNum('5')" class="kiosk-btn bg-white/5 h-16 text-2xl font-medium rounded-2xl border border-white/5">5</button>
+                    <button onclick="appendNum('6')" class="kiosk-btn bg-white/5 h-16 text-2xl font-medium rounded-2xl border border-white/5">6</button>
+                    <button onclick="appendNum('7')" class="kiosk-btn bg-white/5 h-16 text-2xl font-medium rounded-2xl border border-white/5">7</button>
+                    <button onclick="appendNum('8')" class="kiosk-btn bg-white/5 h-16 text-2xl font-medium rounded-2xl border border-white/5">8</button>
+                    <button onclick="appendNum('9')" class="kiosk-btn bg-white/5 h-16 text-2xl font-medium rounded-2xl border border-white/5">9</button>
+                    <button onclick="clearDisplay()" class="kiosk-btn bg-red-500/10 text-red-400 h-16 text-xs font-bold rounded-2xl">CLEAR</button>
+                    <button onclick="appendNum('0')" class="kiosk-btn bg-white/5 h-16 text-2xl font-medium rounded-2xl border border-white/5">0</button>
+                    <button onclick="submitId()" class="kiosk-btn bg-yellow-500 text-black h-16 text-xs font-black rounded-2xl">ENTER</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SCREEN 2: CAMERA -->
+        <div id="screen-camera" class="hidden fixed inset-0 bg-black flex flex-col items-center justify-center fade-in z-[60]">
+            <video id="camera-feed" autoplay playsinline class="h-full w-full object-cover opacity-60"></video>
+            
+            <!-- Tech UI Overlay -->
+            <div class="absolute inset-0 pointer-events-none flex flex-col items-center justify-between p-12">
+                <!-- ID Badge -->
+                <div class="w-full flex justify-between items-start">
+                    <div class="glass-panel p-4 rounded-2xl border-l-4 border-yellow-500 min-w-[160px]">
+                        <p class="text-[10px] font-bold uppercase tracking-widest text-yellow-500 mb-1">Authenticated</p>
+                        <p id="camera-worker-name" class="text-white font-bold text-xl uppercase leading-tight">---</p>
+                        <p id="camera-id-badge" class="num-font text-[10px] text-slate-400 mt-1">ID: ----</p>
+                    </div>
+                    <div class="px-4 py-2 bg-red-600 rounded-lg text-[10px] font-black animate-pulse flex items-center gap-2">
+                        <i class="fa-solid fa-video"></i> SCANNING
+                    </div>
+                </div>
+
+                <!-- Central Scan Area -->
+                <div class="relative w-72 h-96 sm:w-80 sm:h-[420px]">
+                    <div class="scanner-line"></div>
+                    
+                    <!-- Brackets -->
+                    <div class="corner-brace top-0 left-0 border-r-0 border-b-0 rounded-tl-3xl"></div>
+                    <div class="corner-brace top-0 right-0 border-l-0 border-b-0 rounded-tr-3xl"></div>
+                    <div class="corner-brace bottom-0 left-0 border-r-0 border-t-0 rounded-bl-3xl"></div>
+                    <div class="corner-brace bottom-0 right-0 border-l-0 border-t-0 rounded-br-3xl"></div>
+                    
+                    <div id="countdown" class="absolute inset-0 flex items-center justify-center text-[10rem] font-bold text-white/40 drop-shadow-2xl italic">5</div>
+                </div>
+
+                <!-- Footer Text -->
+                <div class="text-center space-y-2 mb-6">
+                    <div class="flex items-center justify-center gap-2 text-yellow-500">
+                        <i class="fa-solid fa-shield-check animate-bounce"></i>
+                        <p class="text-lg font-bold uppercase tracking-[0.2em]">Safety Audit in Progress</p>
+                    </div>
+                    <p class="text-xs text-white/50">Ensure Helmet and Vest are clearly visible</p>
+                </div>
+            </div>
+            <canvas id="capture-canvas" class="hidden"></canvas>
+        </div>
+
+        <!-- SCREEN 3: RESULT -->
+        <div id="screen-result" class="hidden fixed inset-0 flex flex-col items-center justify-center p-6 fade-in z-[70] bg-slate-950/90 backdrop-blur-md">
+            <div id="result-card" class="w-full max-w-lg p-10 rounded-[3rem] border-t border-white/20 text-center shadow-2xl relative bg-slate-900">
+                <div id="icon-container" class="w-24 h-24 rounded-full flex items-center justify-center border-4 mb-8 mx-auto"><i id="result-icon" class="text-4xl"></i></div>
+                <h2 id="result-status" class="text-5xl font-black uppercase mb-3 tracking-tighter"></h2>
+                <div id="result-message" class="text-lg opacity-80 mb-10 px-6 font-medium"></div>
+                
+                <!-- PPE Violation List -->
+                <div id="result-missing" class="bg-black/40 p-6 rounded-[2rem] mb-10 border border-white/5 hidden">
+                    <p class="text-[10px] uppercase font-bold text-slate-500 mb-4 tracking-widest flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-triangle-exclamation text-red-500"></i> Required Equipment Missing
+                    </p>
+                    <div id="missing-list" class="flex flex-wrap justify-center gap-2"></div>
+                </div>
+                
+                <div class="space-y-4">
+                    <button onclick="resetSystem()" class="w-full bg-white text-black py-6 rounded-[1.8rem] text-xl font-bold kiosk-btn shadow-lg">DISMISS</button>
+                    
+                    <!-- MANUAL UPLOAD OPTION -->
+                    <div id="manual-upload-area" class="hidden">
+                        <div class="h-px bg-white/10 w-full my-6"></div>
+                        <p class="text-xs text-slate-500 mb-4 font-medium italic">Incorrect detection? Upload proof for admin approval.</p>
+                        <input type="file" id="manual-file" accept="image/*" class="hidden" onchange="handleManualUpload(this)">
+                        <button onclick="document.getElementById('manual-file').click()" class="w-full border border-white/20 text-white py-4 rounded-[1.5rem] text-sm font-bold kiosk-btn hover:bg-white/5">
+                            <i class="fa-solid fa-camera-retro mr-2"></i> UPLOAD VERIFICATION IMAGE
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- LOADING -->
+        <div id="screen-loading" class="hidden fixed inset-0 bg-slate-900/98 flex flex-col items-center justify-center z-[100] backdrop-blur-xl">
+            <div class="relative w-32 h-32">
+                <div class="absolute inset-0 border-8 border-white/5 rounded-full"></div>
+                <div class="absolute inset-0 border-8 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+            <p id="loading-text" class="mt-10 text-xl font-bold uppercase tracking-widest text-white animate-pulse">Processing...</p>
+        </div>
+    </main>
+
+    <script>
+        const API_URL = window.location.origin;
+        let currentId = "", stream = null, currentName = "";
+
+        setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleTimeString('en-GB'); }, 1000);
+        function appendNum(n) { if (currentId.length < 4) { currentId += n; document.getElementById('worker-id-display').value = currentId; } }
+        function clearDisplay() { currentId = ""; document.getElementById('worker-id-display').value = ""; }
+
+        async function submitId() {
+            if (currentId.length < 4) return;
+            document.getElementById('loading-text').innerText = "IDENTIFYING PERSONNEL...";
+            showScreen('screen-loading');
+            try {
+                const res = await fetch(`${API_URL}/precheck`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ worker_id: currentId }) });
+                const result = await res.json();
+                if (res.ok) {
+                    currentName = result.worker_name;
+                    document.getElementById('camera-worker-name').innerText = currentName;
+                    document.getElementById('camera-id-badge').innerText = `ID: ${currentId}`;
+                    showScreen('screen-camera');
+                    startCamera();
+                } else { displayResult({ status: 'ERROR', message: result.message }); }
+            } catch (err) { displayResult({ status: 'ERROR', message: 'Connection Offline' }); }
+        }
+
+        async function startCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: "user",
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    } 
+                });
+                document.getElementById('camera-feed').srcObject = stream;
+                let count = 5;
+                const interval = setInterval(() => {
+                    count--;
+                    document.getElementById('countdown').innerText = count;
+                    if (count === 0) { clearInterval(interval); captureAndVerify(); }
+                }, 1000);
+            } catch (err) { resetSystem(); }
+        }
+
+        async function captureAndVerify() {
+            const video = document.getElementById('camera-feed');
+            const canvas = document.getElementById('capture-canvas');
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            const imageData = canvas.toDataURL('image/jpeg', 0.8);
+            if (stream) stream.getTracks().forEach(t => t.stop());
+            document.getElementById('loading-text').innerText = "PERFORMING PPE AUDIT...";
+            showScreen('screen-loading');
+            try {
+                const res = await fetch(`${API_URL}/verify`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ worker_id: currentId, image: imageData }) });
+                const result = await res.json();
+                displayResult(result);
+            } catch (err) { displayResult({ status: 'ERROR', message: 'Safety Audit Failed' }); }
+        }
+
+        async function handleManualUpload(input) {
+            if (!input.files || !input.files[0]) return;
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                showScreen('screen-loading');
+                document.getElementById('loading-text').innerText = "TRANSMITTING PROOF...";
+                try {
+                    const res = await fetch(`${API_URL}/manual-upload`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ worker_id: currentId, image: e.target.result }) });
+                    if (res.ok) { displayResult({ status: 'PRESENT', worker_name: currentName, manual: true }); }
+                } catch (err) { alert('Transmission failed'); showScreen('screen-result'); }
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+
+        function displayResult(res) {
+            showScreen('screen-result');
+            const status = document.getElementById('result-status'), 
+                  msg = document.getElementById('result-message'), 
+                  icon = document.getElementById('result-icon'), 
+                  missingDiv = document.getElementById('result-missing'), 
+                  manualArea = document.getElementById('manual-upload-area'),
+                  iconContainer = document.getElementById('icon-container');
+            
+            missingDiv.classList.add('hidden');
+            manualArea.classList.add('hidden');
+
+            if (res.status === 'PRESENT') {
+                status.innerText = "VERIFIED"; status.className = "text-5xl font-black text-green-500 uppercase tracking-tighter";
+                msg.innerText = res.manual ? "Proof transmitted for administrative review." : `Welcome, ${res.worker_name}. PPE compliance confirmed.`;
+                icon.className = "fa-solid fa-shield-check text-green-500";
+                iconContainer.className = "w-24 h-24 rounded-full flex items-center justify-center border-4 border-green-500 mb-8 mx-auto shadow-[0_0_20px_rgba(34,197,94,0.3)]";
+            } else if (res.status === 'ABSENT') {
+                status.innerText = "DENIED"; status.className = "text-5xl font-black text-red-500 uppercase tracking-tighter";
+                msg.innerText = "Safety requirements not met."; icon.className = "fa-solid fa-shield-xmark text-red-500";
+                iconContainer.className = "w-24 h-24 rounded-full flex items-center justify-center border-4 border-red-500 mb-8 mx-auto shadow-[0_0_20px_rgba(239,68,68,0.3)]";
+                manualArea.classList.remove('hidden');
+                if (res.missing) {
+                    missingDiv.classList.remove('hidden');
+                    document.getElementById('missing-list').innerHTML = res.missing.split(',').map(i => `<span class="px-4 py-2 bg-red-500/10 text-red-400 text-xs font-black rounded-xl border border-red-500/20 uppercase tracking-wider">${i.trim()}</span>`).join('');
+                }
+            } else {
+                status.innerText = "RETRY"; status.className = "text-5xl font-black text-yellow-500 uppercase tracking-tighter";
+                msg.innerText = res.message || "Environment audit incomplete."; 
+                icon.className = "fa-solid fa-triangle-exclamation text-yellow-500";
+                iconContainer.className = "w-24 h-24 rounded-full flex items-center justify-center border-4 border-yellow-500 mb-8 mx-auto shadow-[0_0_20px_rgba(250,204,21,0.3)]";
+            }
+        }
+
+        function showScreen(id) { 
+            ['screen-id', 'screen-camera', 'screen-result', 'screen-loading'].forEach(s => document.getElementById(s).classList.add('hidden')); 
+            document.getElementById(id).classList.remove('hidden'); 
+        }
+
+        function resetSystem() { 
+            currentId = ""; 
+            currentName = ""; 
+            document.getElementById('worker-id-display').value = ""; 
+            document.getElementById('countdown').innerText = "5";
+            showScreen('screen-id'); 
+            if (stream) stream.getTracks().forEach(t => t.stop()); 
+        }
+    </script>
+</body>
+</html>

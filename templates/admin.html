@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | Pro-Shield AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+        body { background-color: #0f172a; color: #f8fafc; font-family: 'Space Grotesk', sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-7xl mx-auto space-y-8">
+        <!-- HEADER -->
+        <header class="flex justify-between items-center bg-slate-900/50 p-6 rounded-3xl border border-white/5">
+            <div>
+                <h1 class="text-3xl font-bold uppercase text-yellow-500 tracking-tighter">Safety Dashboard</h1>
+                <p class="text-slate-400 text-sm">Text-Only Compliance Logs</p>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="fetchStats(); fetchLogs();" class="p-3 bg-white/5 rounded-xl hover:bg-white/10"><i class="fa-solid fa-rotate"></i></button>
+                <a href="/" class="px-6 py-3 bg-white/10 rounded-xl font-bold hover:bg-white/20 transition">← Kiosk Mode</a>
+            </div>
+        </header>
+
+        <!-- STATS CARDS -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div class="glass p-6 rounded-3xl border-l-4 border-yellow-500">
+                <p class="text-slate-400 text-xs uppercase font-bold tracking-widest mb-1">Total Personnel</p>
+                <h3 id="stat-total" class="text-4xl font-bold tracking-tighter">0</h3>
+            </div>
+            <div class="glass p-6 rounded-3xl border-l-4 border-green-500">
+                <p class="text-slate-400 text-xs uppercase font-bold tracking-widest mb-1">Present Today</p>
+                <h3 id="stat-present" class="text-4xl font-bold tracking-tighter text-green-500">0</h3>
+            </div>
+            <div class="glass p-6 rounded-3xl border-l-4 border-red-500">
+                <p class="text-slate-400 text-xs uppercase font-bold tracking-widest mb-1">Denied Today</p>
+                <h3 id="stat-absent" class="text-4xl font-bold tracking-tighter text-red-500">0</h3>
+            </div>
+            <div class="glass p-6 rounded-3xl border-l-4 border-blue-500">
+                <p class="text-slate-400 text-xs uppercase font-bold tracking-widest mb-1">Compliance Rate</p>
+                <h3 id="stat-rate" class="text-4xl font-bold tracking-tighter">0%</h3>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- REGISTER PANEL -->
+            <div class="space-y-6">
+                <div id="register-card" class="glass p-6 rounded-3xl">
+                    <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i class="fa-solid fa-user-plus text-yellow-500"></i> New Personnel</h2>
+                    <div class="space-y-4">
+                        <div>
+                            <p class="text-[10px] uppercase font-bold text-slate-500 tracking-widest mb-1">Personnel Name</p>
+                            <input id="new-name" type="text" placeholder="Enter Full Name" class="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-yellow-500">
+                        </div>
+                        <div id="last-id-container" class="hidden">
+                            <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-3 flex justify-between items-center">
+                                <div>
+                                    <p class="text-[9px] uppercase font-bold text-yellow-500">Assigned ID</p>
+                                    <p id="display-assigned-id" class="text-lg font-mono font-bold text-white">----</p>
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="addWorker()" class="w-full bg-yellow-500 text-black font-bold py-3 rounded-xl hover:bg-yellow-400 transition">Register Worker</button>
+                    </div>
+                </div>
+                <div class="glass p-6 rounded-3xl h-[400px] flex flex-col">
+                    <h2 class="text-xl font-bold mb-4">Registry</h2>
+                    <div id="worker-list" class="flex-grow overflow-y-auto space-y-2 pr-2"></div>
+                </div>
+            </div>
+
+            <!-- LOGS PANEL -->
+            <div class="lg:col-span-2 glass p-6 rounded-3xl overflow-hidden flex flex-col">
+                <h2 class="text-xl font-bold mb-6 flex items-center gap-2"><i class="fa-solid fa-history text-yellow-500"></i> Personnel Logs</h2>
+                <div class="flex-grow overflow-x-auto overflow-y-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="sticky top-0 bg-slate-900/90 backdrop-blur z-10">
+                            <tr class="text-slate-500 uppercase text-[10px] tracking-widest border-b border-white/10">
+                                <th class="pb-3 px-2">Worker ID</th>
+                                <th class="pb-3 px-2">Status</th>
+                                <th class="pb-3 px-2">PPE Audit</th>
+                                <th class="pb-3 px-2">Timestamp</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logs-table"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin === "null" ? "http://localhost:5000" : window.location.origin;
+
+        async function fetchStats() {
+            try {
+                const res = await fetch(`${API_URL}/api/stats`);
+                const data = await res.json();
+                document.getElementById('stat-total').innerText = data.total_workers;
+                document.getElementById('stat-present').innerText = data.present;
+                document.getElementById('stat-absent').innerText = data.absent;
+                const totalSeen = data.present + data.absent;
+                document.getElementById('stat-rate').innerText = totalSeen > 0 ? Math.round((data.present / totalSeen) * 100) + '%' : '0%';
+            } catch (err) { console.error(err); }
+        }
+
+        async function fetchWorkers() {
+            try {
+                const res = await fetch(`${API_URL}/api/workers`);
+                const data = await res.json();
+                document.getElementById('worker-list').innerHTML = data.map(w => `
+                    <div class="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-white/5">
+                        <div><p class="font-bold text-sm text-slate-200">${w.name}</p><p class="text-[10px] font-mono text-slate-500">ID: ${w.worker_id}</p></div>
+                        <button onclick="deleteWorker('${w.worker_id}')" class="text-red-500 p-2 hover:bg-red-500/10 rounded-lg transition"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                `).join('');
+            } catch (err) { console.error(err); }
+        }
+
+        async function fetchLogs() {
+            try {
+                const res = await fetch(`${API_URL}/api/logs`);
+                const data = await res.json();
+                document.getElementById('logs-table').innerHTML = data.map(log => `
+                    <tr class="border-b border-white/5 hover:bg-white/5 transition">
+                        <td class="py-4 px-2">
+                            <p class="font-bold text-slate-200">${log.worker_id}</p>
+                        </td>
+                        <td class="py-4 px-2">
+                            <span class="px-2 py-1 rounded-lg text-[10px] font-black ${log.attendance_status === 'PRESENT' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}">
+                                ${log.attendance_status}
+                            </span>
+                        </td>
+                        <td class="py-4 px-2">
+                            <p class="text-[10px] font-bold ${log.ppe_status === 'PASSED' ? 'text-green-500' : (log.ppe_status === 'MANUAL_VERIFIED' ? 'text-blue-400' : 'text-red-400')}">${log.ppe_status}</p>
+                            <p class="text-[10px] text-slate-400 italic">${log.ppe_missing_items || 'System Clean'}</p>
+                        </td>
+                        <td class="py-4 px-2 text-[10px] text-slate-500 font-mono">
+                            ${new Date(log.created_at).toLocaleString('en-GB')}
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (err) { console.error(err); }
+        }
+
+        async function addWorker() {
+            const nameInput = document.getElementById('new-name');
+            const name = nameInput.value;
+            if(!name) return;
+            try {
+                const res = await fetch(`${API_URL}/api/workers`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name: name }) });
+                const result = await res.json();
+                if (result.worker_id) {
+                    document.getElementById('display-assigned-id').innerText = result.worker_id;
+                    document.getElementById('last-id-container').classList.remove('hidden');
+                }
+                nameInput.value = '';
+                fetchWorkers(); fetchStats();
+            } catch (err) { console.error(err); }
+        }
+
+        async function deleteWorker(id) {
+            if(!confirm("Delete worker and logs?")) return;
+            try {
+                await fetch(`${API_URL}/api/workers/${id}`, { method: 'DELETE' });
+                fetchWorkers(); fetchLogs(); fetchStats();
+            } catch (err) { console.error(err); }
+        }
+
+        fetchWorkers(); fetchStats(); fetchLogs();
+    </script>
+</body>
+</html>
