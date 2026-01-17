@@ -22,6 +22,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 app = Flask(__name__)
 CORS(app)
 
+# Initialize Supabase with the Service Role Key
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 genai.configure(api_key=GEMINI_API_KEY)
 
@@ -151,17 +152,10 @@ def manual_upload():
 def get_stats():
     today = datetime.now().date().isoformat()
     try:
-        # Fetch today's records
         logs = supabase.table("attendance").select("worker_id, attendance_status").eq("date", today).execute()
-        
-        # logic to count UNIQUE workers
-        # Get set of all worker IDs who achieved a "PRESENT" status today
         present_workers = {l['worker_id'] for l in logs.data if l['attendance_status'] == 'PRESENT'}
-        
-        # Get set of all worker IDs who attempted today but ONLY have "ABSENT" statuses
         all_attempted_workers = {l['worker_id'] for l in logs.data}
         absent_only_workers = all_attempted_workers - present_workers
-        
         total_workers_in_db = supabase.table("workers").select("id", count="exact").execute().count
         
         return jsonify({
@@ -174,7 +168,6 @@ def get_stats():
 
 @app.route("/api/logs", methods=["GET"])
 def get_logs():
-    # Only select relevant text fields
     logs = supabase.table("attendance").select("worker_id, attendance_status, ppe_status, ppe_missing_items, created_at").order("created_at", desc=True).execute()
     return jsonify(logs.data)
 
@@ -218,5 +211,7 @@ def delete_worker(worker_id):
     supabase.table("workers").delete().eq("worker_id", worker_id).execute()
     return jsonify({"status": "ok"})
 
+# Vercel handles the application entry point. 
+# The 'app' object defined above is what Vercel will use.
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
