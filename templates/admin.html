@@ -163,31 +163,50 @@
             const logs = await logsRes.json();
             
             const today = new Date().toISOString().split('T')[0];
-            const presentIds = new Set(logs.filter(l => l.attendance_status === 'PRESENT' && l.created_at.startsWith(today)).map(l => l.worker_id));
+            const todayLogs = logs.filter(l => l.created_at.startsWith(today));
+            
+            const presentIds = new Set(todayLogs.filter(l => l.attendance_status === 'PRESENT').map(l => l.worker_id));
+            const absentIds = new Set(todayLogs.filter(l => l.attendance_status === 'ABSENT').map(l => l.worker_id));
 
             document.getElementById('attendance-grid').innerHTML = workers.map(w => {
                 const isPresent = presentIds.has(w.worker_id);
+                const isAbsent = absentIds.has(w.worker_id);
+                
+                let statusBadge = '';
+                if (isPresent) {
+                    statusBadge = '<span class="text-[10px] bg-green-500/20 text-green-500 px-3 py-1 rounded-full font-bold">PRESENT</span>';
+                } else if (isAbsent) {
+                    statusBadge = '<span class="text-[10px] bg-red-500/20 text-red-500 px-3 py-1 rounded-full font-bold">ABSENT</span>';
+                }
+
                 return `
-                    <div class="glass p-5 rounded-2xl border ${isPresent ? 'border-green-500/30' : 'border-red-500/30'} flex justify-between items-center">
-                        <div>
-                            <p class="font-bold text-sm">${w.name}</p>
-                            <p class="text-[10px] font-mono text-slate-500 italic">ID: ${w.worker_id}</p>
+                    <div class="glass p-5 rounded-2xl border ${isPresent ? 'border-green-500/30' : (isAbsent ? 'border-red-500/30' : 'border-white/10')} flex flex-col gap-4">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="font-bold text-sm">${w.name}</p>
+                                <p class="text-[10px] font-mono text-slate-500 italic">ID: ${w.worker_id}</p>
+                            </div>
+                            ${statusBadge}
                         </div>
-                        ${isPresent ? 
-                            '<span class="text-[10px] bg-green-500/20 text-green-500 px-3 py-1 rounded-full font-bold">PRESENT</span>' : 
-                            `<button onclick="manualMark('${w.worker_id}')" class="text-[10px] bg-yellow-500 text-black px-3 py-1 rounded-full font-bold hover:bg-yellow-400">MARK PRESENT</button>`
-                        }
+                        <div class="flex gap-2">
+                            <button onclick="manualMark('${w.worker_id}', 'PRESENT')" class="flex-1 text-[9px] bg-green-600 text-white py-2 rounded-lg font-bold hover:bg-green-500 transition uppercase tracking-wider">
+                                ${isPresent ? 'Update Present' : 'Mark Present'}
+                            </button>
+                            <button onclick="manualMark('${w.worker_id}', 'ABSENT')" class="flex-1 text-[9px] bg-red-900/40 text-red-400 border border-red-500/30 py-2 rounded-lg font-bold hover:bg-red-900/60 transition uppercase tracking-wider">
+                                ${isAbsent ? 'Update Absent' : 'Mark Absent'}
+                            </button>
+                        </div>
                     </div>
                 `;
             }).join('');
         }
 
-        async function manualMark(id) {
-            if(!confirm(`Manually check-in worker ${id}?`)) return;
+        async function manualMark(id, status) {
+            if(!confirm(`Manually mark worker ${id} as ${status}?`)) return;
             await fetch(`${API_URL}/api/manual-mark`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({worker_id: id})
+                body: JSON.stringify({worker_id: id, status: status})
             });
             refreshAll();
         }
@@ -204,7 +223,7 @@
                         </span>
                     </td>
                     <td class="py-4 px-2">
-                        <p class="text-[10px] font-bold ${log.ppe_status === 'PASSED' ? 'text-green-500' : (log.ppe_status === 'MANUAL_VERIFIED' ? 'text-blue-400' : 'text-red-400')}">${log.ppe_status}</p>
+                        <p class="text-[10px] font-bold ${log.ppe_status === 'PASSED' ? 'text-green-500' : (log.ppe_status === 'MANUAL_VERIFIED' ? 'text-blue-400' : (log.ppe_status === 'ADMIN_OVERRIDE' ? 'text-yellow-500' : 'text-red-400'))}">${log.ppe_status}</p>
                         <p class="text-[10px] text-slate-400 italic">${log.ppe_missing_items || 'System Clean'}</p>
                     </td>
                     <td class="py-4 px-2 text-[10px] text-slate-500 font-mono">
