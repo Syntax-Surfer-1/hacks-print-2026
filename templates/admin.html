@@ -13,6 +13,7 @@
         .tab-btn.active { color: #facc15; border-bottom: 2px solid #facc15; }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -20,9 +21,16 @@
         
         <!-- HEADER -->
         <header class="flex flex-col md:flex-row justify-between items-center bg-slate-900/50 p-6 rounded-3xl border border-white/5 gap-4">
-            <div>
-                <h1 class="text-3xl font-bold uppercase text-yellow-500 tracking-tighter">Safety Dashboard</h1>
-                <p class="text-slate-400 text-sm">Text-Only Compliance Logs</p>
+            <div class="flex items-center gap-4">
+                <div>
+                    <h1 class="text-3xl font-bold uppercase text-yellow-500 tracking-tighter">Safety Dashboard</h1>
+                    <p class="text-slate-400 text-sm">Text-Only Compliance Logs</p>
+                </div>
+                <div class="h-10 w-px bg-white/10 hidden md:block"></div>
+                <div class="flex flex-col">
+                    <p class="text-[10px] uppercase font-bold text-slate-500 tracking-widest mb-1">Viewing Date</p>
+                    <input type="date" id="view-date" onchange="refreshAll()" class="bg-white/5 border border-white/10 rounded-lg px-3 py-1 text-sm outline-none focus:border-yellow-500">
+                </div>
             </div>
             
             <nav class="flex gap-4">
@@ -57,11 +65,11 @@
             </div>
         </div>
 
-        <!-- DASHBOARD TAB: TODAY'S GRID -->
+        <!-- DASHBOARD TAB: GRID -->
         <div id="content-dashboard" class="tab-content space-y-6">
             <div class="glass p-6 rounded-3xl">
                 <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
-                    <i class="fa-solid fa-calendar-day text-yellow-500"></i> Today's Attendance Checklist
+                    <i class="fa-solid fa-calendar-day text-yellow-500"></i> Attendance Checklist
                 </h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="attendance-grid">
                     <!-- Cards load here -->
@@ -118,6 +126,9 @@
     <script>
         const API_URL = window.location.origin === "null" ? "http://localhost:5000" : window.location.origin;
 
+        // Set default date to today
+        document.getElementById('view-date').value = new Date().toISOString().split('T')[0];
+
         function switchTab(tab) {
             document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active', 'text-yellow-500'));
@@ -128,14 +139,15 @@
         }
 
         async function refreshAll() {
-            await fetchStats();
+            const date = document.getElementById('view-date').value;
+            await fetchStats(date);
             await fetchWorkers();
-            await fetchLogs();
-            await loadAttendanceGrid();
+            await fetchLogs(date);
+            await loadAttendanceGrid(date);
         }
 
-        async function fetchStats() {
-            const res = await fetch(`${API_URL}/api/stats`);
+        async function fetchStats(date) {
+            const res = await fetch(`${API_URL}/api/stats?date=${date}`);
             const data = await res.json();
             document.getElementById('stat-total').innerText = data.total_workers;
             document.getElementById('stat-present').innerText = data.present;
@@ -156,27 +168,30 @@
             return data;
         }
 
-        async function loadAttendanceGrid() {
+        async function loadAttendanceGrid(date) {
             const workersRes = await fetch(`${API_URL}/api/workers`);
             const workers = await workersRes.json();
-            const logsRes = await fetch(`${API_URL}/api/logs`);
+            const logsRes = await fetch(`${API_URL}/api/logs?date=${date}`);
             const logs = await logsRes.json();
             
-            const today = new Date().toISOString().split('T')[0];
-            const todayLogs = logs.filter(l => l.created_at.startsWith(today));
-            
-            const presentIds = new Set(todayLogs.filter(l => l.attendance_status === 'PRESENT').map(l => l.worker_id));
-            const absentIds = new Set(todayLogs.filter(l => l.attendance_status === 'ABSENT').map(l => l.worker_id));
+            // Map LATEST status for each worker
+            const statusMap = {};
+            logs.sort((a,b) => new Date(a.created_at) - new Date(b.created_at)).forEach(l => {
+                statusMap[l.worker_id] = l.attendance_status;
+            });
 
             document.getElementById('attendance-grid').innerHTML = workers.map(w => {
-                const isPresent = presentIds.has(w.worker_id);
-                const isAbsent = absentIds.has(w.worker_id);
+                const status = statusMap[w.worker_id];
+                const isPresent = status === 'PRESENT';
+                const isAbsent = status === 'ABSENT';
                 
                 let statusBadge = '';
                 if (isPresent) {
                     statusBadge = '<span class="text-[10px] bg-green-500/20 text-green-500 px-3 py-1 rounded-full font-bold">PRESENT</span>';
                 } else if (isAbsent) {
                     statusBadge = '<span class="text-[10px] bg-red-500/20 text-red-500 px-3 py-1 rounded-full font-bold">ABSENT</span>';
+                } else {
+                    statusBadge = '<span class="text-[10px] bg-white/5 text-slate-500 px-3 py-1 rounded-full font-bold">NO SHOW</span>';
                 }
 
                 return `
@@ -190,10 +205,10 @@
                         </div>
                         <div class="flex gap-2">
                             <button onclick="manualMark('${w.worker_id}', 'PRESENT')" class="flex-1 text-[9px] bg-green-600 text-white py-2 rounded-lg font-bold hover:bg-green-500 transition uppercase tracking-wider">
-                                ${isPresent ? 'Update Present' : 'Mark Present'}
+                                ${isPresent ? 'Update' : 'Mark Present'}
                             </button>
                             <button onclick="manualMark('${w.worker_id}', 'ABSENT')" class="flex-1 text-[9px] bg-red-900/40 text-red-400 border border-red-500/30 py-2 rounded-lg font-bold hover:bg-red-900/60 transition uppercase tracking-wider">
-                                ${isAbsent ? 'Update Absent' : 'Mark Absent'}
+                                ${isAbsent ? 'Update' : 'Mark Absent'}
                             </button>
                         </div>
                     </div>
@@ -202,17 +217,18 @@
         }
 
         async function manualMark(id, status) {
-            if(!confirm(`Manually mark worker ${id} as ${status}?`)) return;
+            const date = document.getElementById('view-date').value;
+            if(!confirm(`Manually mark worker ${id} as ${status} for ${date}?`)) return;
             await fetch(`${API_URL}/api/manual-mark`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({worker_id: id, status: status})
+                body: JSON.stringify({worker_id: id, status: status, date: date})
             });
             refreshAll();
         }
 
-        async function fetchLogs() {
-            const res = await fetch(`${API_URL}/api/logs`);
+        async function fetchLogs(date) {
+            const res = await fetch(`${API_URL}/api/logs?date=${date}`);
             const data = await res.json();
             document.getElementById('logs-table').innerHTML = data.map(log => `
                 <tr class="border-b border-white/5 hover:bg-white/5 transition">
